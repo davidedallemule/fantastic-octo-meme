@@ -2,175 +2,204 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Color Note WebApp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Color Sound</title>
   <style>
     body {
       margin: 0;
       background-color: #2c2c2c;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      overflow: hidden;
-      font-family: sans-serif;
       color: white;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
-    #videoWrapper {
+
+    #container {
+      position: relative;
+      width: 90vmin;
+      height: 90vmin;
       border-radius: 50%;
       overflow: hidden;
-      width: 80vmin;
-      height: 80vmin;
-      position: relative;
+      margin-top: 20px;
+      box-shadow: 0 0 30px rgba(0,0,0,0.6);
     }
+
     video {
       width: 100%;
       height: 100%;
       object-fit: cover;
+      transform: scaleX(-1); /* Mirroring */
     }
-    #status {
+
+    #overlay {
       position: absolute;
-      bottom: 10px;
-      width: 100%;
-      text-align: center;
-      font-size: 1.2em;
-      color: white;
-      text-shadow: 0 0 4px black;
+      top: 50%;
+      left: 50%;
+      width: 60px;
+      height: 60px;
+      margin-left: -30px;
+      margin-top: -30px;
+      border: 2px solid white;
+      box-sizing: border-box;
     }
+
+    #overlay::before, #overlay::after {
+      content: "";
+      position: absolute;
+      background: white;
+    }
+
+    #overlay::before {
+      width: 100%;
+      height: 2px;
+      top: 50%;
+      left: 0;
+    }
+
+    #overlay::after {
+      height: 100%;
+      width: 2px;
+      left: 50%;
+      top: 0;
+    }
+
+    #status {
+      margin-top: 20px;
+      font-size: 1.2em;
+      text-align: center;
+    }
+
     canvas {
       display: none;
     }
   </style>
 </head>
 <body>
-  <div id="videoWrapper">
+  <h1>Color Sound</h1>
+  <div id="container">
     <video id="video" autoplay playsinline></video>
-    <div id="status">Avvio...</div>
+    <div id="overlay"></div>
   </div>
-  <canvas id="canvas"></canvas>
+  <div id="status">Nessun colore riconosciuto</div>
+  <canvas id="canvas" width="1" height="1"></canvas>
 
   <script>
     const video = document.getElementById("video");
     const canvas = document.getElementById("canvas");
     const ctx = canvas.getContext("2d");
-    const statusText = document.getElementById("status");
+    const status = document.getElementById("status");
 
-    let currentNote = null;
-    let oscillator = null;
-    let audioCtx = null;
-
-    const colorMap = [
-      { name: "DO", rgb: [0, 0, 0], note: "C4" },         // Nero
-      { name: "RE", rgb: [135, 206, 235], note: "D4" },   // Azzurro
-      { name: "MI", rgb: [0, 128, 0], note: "E4" },       // Verde
-      { name: "FA", rgb: [255, 255, 0], note: "F4" },     // Giallo
-      { name: "SOL", rgb: [255, 165, 0], note: "G4" },    // Arancione
-      { name: "LA", rgb: [255, 0, 0], note: "A4" },       // Rosso
-      { name: "SI", rgb: [128, 0, 128], note: "B4" }      // Viola
-    ];
-
-    const noteFrequencies = {
-      "C4": 261.63,
-      "D4": 293.66,
-      "E4": 329.63,
-      "F4": 349.23,
-      "G4": 392.00,
-      "A4": 440.00,
-      "B4": 493.88
+    const colorMap = {
+      nero: { note: "C", freq: 261.63 },
+      azzurro: { note: "D", freq: 293.66 },
+      verde: { note: "E", freq: 329.63 },
+      giallo: { note: "F", freq: 349.23 },
+      arancione: { note: "G", freq: 392.00 },
+      rosso: { note: "A", freq: 440.00 },
+      viola: { note: "B", freq: 493.88 },
     };
 
-    function getColorDistance(c1, c2) {
-      return Math.sqrt(
-        Math.pow(c1[0] - c2[0], 2) +
-        Math.pow(c1[1] - c2[1], 2) +
-        Math.pow(c1[2] - c2[2], 2)
-      );
-    }
+    let currentNote = null;
+    let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    let oscillator = null;
+    let gainNode = audioCtx.createGain();
+    gainNode.connect(audioCtx.destination);
+    gainNode.gain.value = 0;
 
-    function getClosestColor(rgb) {
-      let minDist = Infinity;
-      let match = null;
-      for (let color of colorMap) {
-        const dist = getColorDistance(rgb, color.rgb);
-        if (dist < 100) { // Tolleranza aumentata
-          if (dist < minDist) {
-            minDist = dist;
-            match = color;
-          }
+    function getClosestColorName(r, g, b) {
+      const distances = {
+        nero: Math.hypot(r - 0, g - 0, b - 0),
+        azzurro: Math.hypot(r - 100, g - 150, b - 255),
+        verde: Math.hypot(r - 0, g - 255, b - 0),
+        giallo: Math.hypot(r - 255, g - 255, b - 0),
+        arancione: Math.hypot(r - 255, g - 165, b - 0),
+        rosso: Math.hypot(r - 255, g - 0, b - 0),
+        viola: Math.hypot(r - 128, g - 0, b - 128),
+      };
+      let min = Infinity;
+      let closest = null;
+      for (let key in distances) {
+        if (distances[key] < min && distances[key] < 130) { // maggiore tolleranza
+          min = distances[key];
+          closest = key;
         }
       }
-      return match;
+      return closest;
     }
 
-    function getBrightness(rgb) {
-      return (rgb[0] + rgb[1] + rgb[2]) / 3;
+    function getBrightness(r, g, b) {
+      return (r + g + b) / 3;
     }
 
-    function playNote(note, brightness) {
-      if (audioCtx == null) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playNote(color, brightness) {
+      if (currentNote === color) return;
+
+      currentNote = color;
+
+      if (!color) {
+        stopSound();
+        status.textContent = "Nessun colore riconosciuto";
+        return;
       }
 
-      const baseFreq = noteFrequencies[note];
-      const brightnessFactor = (brightness - 50) / 200; // regola acuti/gravi
-      const frequency = baseFreq + brightnessFactor * 200;
+      const { note, freq } = colorMap[color];
+      const pitch = freq * (1 + (brightness - 128) / 128); // più sensibile
+      status.textContent = `Nota: ${note}`;
+
+      if (oscillator) oscillator.stop();
 
       oscillator = audioCtx.createOscillator();
-      oscillator.type = "sine";
-      oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
-      oscillator.connect(audioCtx.destination);
+      oscillator.type = "triangle"; // suono più morbido tipo flauto
+      oscillator.frequency.setValueAtTime(pitch, audioCtx.currentTime);
+      oscillator.connect(gainNode);
+
+      gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.05);
+
       oscillator.start();
     }
 
-    function stopNote() {
-      if (oscillator) {
-        oscillator.stop();
-        oscillator.disconnect();
-        oscillator = null;
-      }
+    function stopSound() {
+      gainNode.gain.cancelScheduledValues(audioCtx.currentTime);
+      gainNode.gain.setValueAtTime(gainNode.gain.value, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.05);
+      currentNote = null;
     }
 
-    async function startVideo() {
+    async function startCamera() {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: "environment" } },
-          audio: false
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         video.srcObject = stream;
+
         video.onloadedmetadata = () => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          analyzeFrame();
+          video.play();
+          scanLoop();
         };
       } catch (err) {
-        statusText.textContent = "Errore accesso fotocamera";
+        status.textContent = "Errore: impossibile accedere alla fotocamera.";
         console.error(err);
       }
     }
 
-    function analyzeFrame() {
-      if (video.readyState === video.HAVE_ENOUGH_DATA) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const frame = ctx.getImageData(canvas.width / 2, canvas.height / 2, 1, 1);
-        const [r, g, b] = frame.data;
-        const color = getClosestColor([r, g, b]);
-        const brightness = getBrightness([r, g, b]);
+    function scanLoop() {
+      ctx.drawImage(video, video.videoWidth / 2, video.videoHeight / 2, 1, 1, 0, 0, 1, 1);
+      const pixel = ctx.getImageData(0, 0, 1, 1).data;
+      const colorName = getClosestColorName(pixel[0], pixel[1], pixel[2]);
+      const brightness = getBrightness(pixel[0], pixel[1], pixel[2]);
 
-        if (color && color.note !== currentNote) {
-          stopNote();
-          playNote(color.note, brightness);
-          currentNote = color.note;
-          statusText.textContent = `Nota: ${color.name}`;
-        } else if (!color) {
-          stopNote();
-          currentNote = null;
-          statusText.textContent = `Nessun colore riconosciuto`;
-        }
+      if (colorName) {
+        playNote(colorName, brightness);
+      } else {
+        stopSound();
       }
-      setTimeout(analyzeFrame, 100); // scansione ogni 100ms
+
+      setTimeout(scanLoop, 100); // scansione ogni 100ms
     }
 
-    startVideo();
+    startCamera();
   </script>
 </body>
 </html>
