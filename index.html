@@ -40,12 +40,27 @@
     <div id="message">Nessun colore riconosciuto</div>
 
     <script>
-        // Funzione per avviare la fotocamera
+        // Funzione per avviare la fotocamera e selezionare la fotocamera principale
         async function startCamera() {
             const videoElement = document.getElementById('videoElement');
             
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                // Otteniamo tutti i dispositivi video (fotocamere)
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(device => device.kind === 'videoinput');
+                
+                // Cerchiamo di ottenere la fotocamera principale (frontale se non è presente quella principale)
+                let videoDeviceId = videoDevices[0].deviceId; // Fotocamera principale di default
+                if (videoDevices.length > 1) {
+                    // Se ci sono più fotocamere, possiamo selezionare quella posteriore (se presente)
+                    videoDeviceId = videoDevices[1].deviceId;
+                }
+
+                // Accesso alla fotocamera con il dispositivo selezionato
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { deviceId: videoDeviceId }
+                });
+
                 videoElement.srcObject = stream;
             } catch (err) {
                 console.log('Errore nell\'accesso alla fotocamera: ', err);
