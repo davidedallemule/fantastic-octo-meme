@@ -1,13 +1,9 @@
-Nessun problema, ti fornisco il codice completo con tutte le modifiche che ti ho suggerito! 👌
-
-Codice completo con tutte le modifiche:
-
 <!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Colore e Note Musicali</title>
+    <title>Riconoscimento Colore e Nota Musicale</title>
 </head>
 <body>
 
@@ -16,7 +12,7 @@ Codice completo con tutte le modifiche:
     <p>Usa la fotocamera per riconoscere i colori e ascoltare la nota corrispondente!</p>
 
     <!-- Video per mostrare il flusso della fotocamera -->
-    <video id="videoElement" width="320" height="240" autoplay></video>
+    <video id="videoElement" width="320" height="240" autoplay muted></video>
 
     <script>
         // Verifica se la fotocamera è supportata
@@ -47,7 +43,7 @@ Codice completo con tutte le modifiche:
 
         // Funzione per riconoscere il colore e emettere la nota
         function riconosciColore(color) {
-            let nota;
+            let nota = "";
             switch(color) {
                 case 'red':
                     nota = 'DO';
@@ -76,11 +72,13 @@ Codice completo con tutte le modifiche:
             return nota;
         }
 
-        // Esegui la logica di riconoscimento dei colori usando un codice di esempio
+        // Esegui la logica di riconoscimento dei colori
         function coloreRiconosciuto(color) {
-            let nota = riconosciColore(color);
-            alert("Colore riconosciuto: " + color + " | Nota: " + nota);
-            // Qui puoi inserire il codice per emettere il suono della nota (es. Web Audio API o un file audio)
+            if (color) {
+                let nota = riconosciColore(color);
+                alert("Colore riconosciuto: " + color + " | Nota: " + nota);
+                // Qui puoi aggiungere il codice per emettere il suono della nota (usando Web Audio API o un file audio)
+            }
         }
 
         // Esempio: chiamata alla funzione con il colore rosso
@@ -89,27 +87,3 @@ Codice completo con tutte le modifiche:
 
 </body>
 </html>
-
-
-
-⸻
-
-Dettagli del codice:
-	•	Verifica fotocamera: Il codice verifica se la fotocamera è supportata dal browser e se il sito è servito su HTTPS.
-	•	Accesso alla fotocamera: Se la fotocamera è supportata e i permessi sono concessi, il flusso video viene mostrato sullo schermo.
-	•	Funzione di riconoscimento colore e nota: Ho incluso una funzione riconosciColore() che associa il colore a una nota musicale. La funzione coloreRiconosciuto() mostra un messaggio con il colore e la nota.
-
-⸻
-
-Cosa puoi fare con questo codice:
-	1.	Aggiungi la logica per riconoscere il colore dalla fotocamera (ad esempio, usando una libreria per il riconoscimento dei colori).
-	2.	Aggiungi il suono della nota musicale quando viene riconosciuto il colore. Puoi farlo con l’API Web Audio oppure con un file audio.
-
-⸻
-
-Prossimi Passi:
-	1.	Sostituisci il codice che avevi con questo codice completo.
-	2.	Testa se funziona correttamente, sia su Chrome che su Safari (su computer e dispositivo mobile).
-	3.	Se vuoi aggiungere il suono della nota, fammi sapere e ti aiuterò con il codice per farlo!
-
-Se hai bisogno di altre modifiche o hai domande, fammi sapere! 😄
