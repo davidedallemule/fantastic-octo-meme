@@ -4,46 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Riconoscimento Colore e Nota Musicale</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+        }
+
+        video {
+            margin-top: 20px;
+            width: 320px;
+            height: 240px;
+            border: 1px solid #ddd;
+        }
+
+        #result {
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
 
     <h1>Riconoscimento Colore e Nota Musicale</h1>
-
     <p>Usa la fotocamera per riconoscere i colori e ascoltare la nota corrispondente!</p>
 
     <!-- Video per mostrare il flusso della fotocamera -->
-    <video id="videoElement" width="320" height="240" autoplay muted></video>
+    <video id="videoElement" autoplay muted></video>
+    <div id="result"></div>
 
     <script>
         // Verifica se la fotocamera è supportata
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             console.log("Fotocamera supportata");
 
-            // Verifica se il sito è HTTPS
-            if (window.location.protocol !== 'https:') {
-                alert('Il sito deve essere caricato su HTTPS per accedere alla fotocamera!');
-            } else {
-                // Richiedi l'accesso alla fotocamera
-                navigator.mediaDevices.getUserMedia({ video: true })
-                    .then(function(stream) {
-                        // Successo: mostra il flusso video
-                        var videoElement = document.getElementById('videoElement');
-                        videoElement.srcObject = stream;
-                    })
-                    .catch(function(error) {
-                        // Gestione errori
-                        console.error("Errore nell'accesso alla fotocamera:", error);
-                        alert("Impossibile accedere alla fotocamera. Assicurati di aver concesso i permessi.");
-                    });
-            }
+            // Accedere alla fotocamera
+            navigator.mediaDevices.getUserMedia({ video: true })
+                .then(function(stream) {
+                    const videoElement = document.getElementById('videoElement');
+                    videoElement.srcObject = stream;
+
+                    // Mostra il flusso video correttamente
+                    videoElement.play();
+                })
+                .catch(function(error) {
+                    console.error("Errore nell'accesso alla fotocamera:", error);
+                    alert("Impossibile accedere alla fotocamera. Assicurati di aver concesso i permessi.");
+                });
         } else {
-            // Se la fotocamera non è supportata
             alert("La fotocamera non è supportata dal tuo browser.");
         }
 
-        // Funzione per riconoscere il colore e emettere la nota
+        // Funzione per riconoscere il colore e associare la nota
         function riconosciColore(color) {
-            let nota = "";
+            let nota;
             switch(color) {
                 case 'red':
                     nota = 'DO';
@@ -72,17 +84,18 @@
             return nota;
         }
 
-        // Esegui la logica di riconoscimento dei colori
-        function coloreRiconosciuto(color) {
-            if (color) {
-                let nota = riconosciColore(color);
-                alert("Colore riconosciuto: " + color + " | Nota: " + nota);
-                // Qui puoi aggiungere il codice per emettere il suono della nota (usando Web Audio API o un file audio)
-            }
+        // Funzione di esempio per mostrare il risultato
+        function mostraRisultato(colore) {
+            let nota = riconosciColore(colore);
+            const resultElement = document.getElementById('result');
+            resultElement.innerHTML = `Colore riconosciuto: <strong>${colore}</strong> | Nota: <strong>${nota}</strong>`;
         }
 
-        // Esempio: chiamata alla funzione con il colore rosso
-        coloreRiconosciuto('red');
+        // Simulazione di riconoscimento del colore
+        // Simula che il colore rosso venga riconosciuto (aggiungi logica di riconoscimento reale qui)
+        mostraRisultato('red');
+
+        // Eventualmente puoi aggiungere qui la logica di riconoscimento del colore della fotocamera
     </script>
 
 </body>
