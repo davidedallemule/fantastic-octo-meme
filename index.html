@@ -1,167 +1,176 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Riconoscimento Colore e Suono</title>
-    <style>
-        body {
-            background-color: #333; /* Colore di sfondo grigio scuro */
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            flex-direction: column;
-            text-align: center;
-        }
-
-        #videoElement {
-            width: 300px;
-            height: 300px;
-            border-radius: 50%; /* Crea un cerchio */
-            object-fit: cover; /* Assicura che il video riempia il cerchio senza distorsioni */
-            border: 5px solid #fff; /* Aggiungi un bordo bianco attorno al cerchio */
-        }
-
-        #message {
-            color: white;
-            margin-top: 20px;
-            font-size: 18px;
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Color Note WebApp</title>
+  <style>
+    body {
+      margin: 0;
+      background-color: #2c2c2c;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      overflow: hidden;
+      font-family: sans-serif;
+      color: white;
+    }
+    #videoWrapper {
+      border-radius: 50%;
+      overflow: hidden;
+      width: 80vmin;
+      height: 80vmin;
+      position: relative;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    #status {
+      position: absolute;
+      bottom: 10px;
+      width: 100%;
+      text-align: center;
+      font-size: 1.2em;
+      color: white;
+      text-shadow: 0 0 4px black;
+    }
+    canvas {
+      display: none;
+    }
+  </style>
 </head>
 <body>
-    <!-- Video della fotocamera -->
-    <video id="videoElement" autoplay></video>
+  <div id="videoWrapper">
+    <video id="video" autoplay playsinline></video>
+    <div id="status">Avvio...</div>
+  </div>
+  <canvas id="canvas"></canvas>
 
-    <!-- Messaggio che mostra il colore riconosciuto -->
-    <div id="message">Nessun colore riconosciuto</div>
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    const statusText = document.getElementById("status");
 
-    <script>
-        // Funzione per avviare la fotocamera e selezionare la fotocamera principale
-        async function startCamera() {
-            const videoElement = document.getElementById('videoElement');
-            
-            try {
-                // Otteniamo tutti i dispositivi video (fotocamere)
-                const devices = await navigator.mediaDevices.enumerateDevices();
-                const videoDevices = devices.filter(device => device.kind === 'videoinput');
-                
-                // Cerchiamo di ottenere la fotocamera principale (frontale se non è presente quella principale)
-                let videoDeviceId = videoDevices[0].deviceId; // Fotocamera principale di default
-                if (videoDevices.length > 1) {
-                    // Se ci sono più fotocamere, possiamo selezionare quella posteriore (se presente)
-                    videoDeviceId = videoDevices[1].deviceId;
-                }
+    let currentNote = null;
+    let oscillator = null;
+    let audioCtx = null;
 
-                // Accesso alla fotocamera con il dispositivo selezionato
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { deviceId: videoDeviceId }
-                });
+    const colorMap = [
+      { name: "DO", rgb: [0, 0, 0], note: "C4" },         // Nero
+      { name: "RE", rgb: [135, 206, 235], note: "D4" },   // Azzurro
+      { name: "MI", rgb: [0, 128, 0], note: "E4" },       // Verde
+      { name: "FA", rgb: [255, 255, 0], note: "F4" },     // Giallo
+      { name: "SOL", rgb: [255, 165, 0], note: "G4" },    // Arancione
+      { name: "LA", rgb: [255, 0, 0], note: "A4" },       // Rosso
+      { name: "SI", rgb: [128, 0, 128], note: "B4" }      // Viola
+    ];
 
-                videoElement.srcObject = stream;
-            } catch (err) {
-                console.log('Errore nell\'accesso alla fotocamera: ', err);
-            }
+    const noteFrequencies = {
+      "C4": 261.63,
+      "D4": 293.66,
+      "E4": 329.63,
+      "F4": 349.23,
+      "G4": 392.00,
+      "A4": 440.00,
+      "B4": 493.88
+    };
+
+    function getColorDistance(c1, c2) {
+      return Math.sqrt(
+        Math.pow(c1[0] - c2[0], 2) +
+        Math.pow(c1[1] - c2[1], 2) +
+        Math.pow(c1[2] - c2[2], 2)
+      );
+    }
+
+    function getClosestColor(rgb) {
+      let minDist = Infinity;
+      let match = null;
+      for (let color of colorMap) {
+        const dist = getColorDistance(rgb, color.rgb);
+        if (dist < 100) { // Tolleranza aumentata
+          if (dist < minDist) {
+            minDist = dist;
+            match = color;
+          }
         }
+      }
+      return match;
+    }
 
-        // Avvia la fotocamera quando la pagina è pronta
-        window.onload = startCamera;
+    function getBrightness(rgb) {
+      return (rgb[0] + rgb[1] + rgb[2]) / 3;
+    }
 
-        // Funzione per analizzare i pixel centrali
-        function getColorFromCamera() {
-            const video = document.getElementById('videoElement');
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            const width = video.videoWidth;
-            const height = video.videoHeight;
+    function playNote(note, brightness) {
+      if (audioCtx == null) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
 
-            canvas.width = width;
-            canvas.height = height;
-            context.drawImage(video, 0, 0, width, height);
+      const baseFreq = noteFrequencies[note];
+      const brightnessFactor = (brightness - 50) / 200; // regola acuti/gravi
+      const frequency = baseFreq + brightnessFactor * 200;
 
-            // Analisi dei pixel (zona centrale)
-            const imageData = context.getImageData(width / 2 - 10, height / 2 - 10, 20, 20);  // Cambiato per ridurre la zona da analizzare
-            const pixels = imageData.data;
+      oscillator = audioCtx.createOscillator();
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, audioCtx.currentTime);
+      oscillator.connect(audioCtx.destination);
+      oscillator.start();
+    }
 
-            let r = 0, g = 0, b = 0;
-            for (let i = 0; i < pixels.length; i += 4) {
-                r += pixels[i];
-                g += pixels[i + 1];
-                b += pixels[i + 2];
-            }
+    function stopNote() {
+      if (oscillator) {
+        oscillator.stop();
+        oscillator.disconnect();
+        oscillator = null;
+      }
+    }
 
-            const pixelCount = pixels.length / 4;
-            r = Math.floor(r / pixelCount);
-            g = Math.floor(g / pixelCount);
-            b = Math.floor(b / pixelCount);
+    async function startVideo() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" } },
+          audio: false
+        });
+        video.srcObject = stream;
+        video.onloadedmetadata = () => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          analyzeFrame();
+        };
+      } catch (err) {
+        statusText.textContent = "Errore accesso fotocamera";
+        console.error(err);
+      }
+    }
 
-            // Convertiamo il risultato in formato esadecimale
-            return rgbToHex(r, g, b);
+    function analyzeFrame() {
+      if (video.readyState === video.HAVE_ENOUGH_DATA) {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const frame = ctx.getImageData(canvas.width / 2, canvas.height / 2, 1, 1);
+        const [r, g, b] = frame.data;
+        const color = getClosestColor([r, g, b]);
+        const brightness = getBrightness([r, g, b]);
+
+        if (color && color.note !== currentNote) {
+          stopNote();
+          playNote(color.note, brightness);
+          currentNote = color.note;
+          statusText.textContent = `Nota: ${color.name}`;
+        } else if (!color) {
+          stopNote();
+          currentNote = null;
+          statusText.textContent = `Nessun colore riconosciuto`;
         }
+      }
+      setTimeout(analyzeFrame, 100); // scansione ogni 100ms
+    }
 
-        // Funzione per convertire RGB in esadecimale
-        function rgbToHex(r, g, b) {
-            return '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1).toUpperCase();
-        }
-
-        // Funzione per determinare la nota in base al colore
-        function getNoteFromColor(hex) {
-            switch (hex) {
-                case '#000000': return { note: 'DO', frequency: 261.63 }; // DO
-                case '#00FFFF': return { note: 'RE', frequency: 293.66 }; // RE (azzurro)
-                case '#008000': return { note: 'MI', frequency: 329.63 }; // MI (verde)
-                case '#FFFF00': return { note: 'FA', frequency: 349.23 }; // FA (giallo)
-                case '#FFA500': return { note: 'SOL', frequency: 392.00 }; // SOL (arancione)
-                case '#FF0000': return { note: 'LA', frequency: 440.00 }; // LA (rosso)
-                case '#800080': return { note: 'SI', frequency: 493.88 }; // SI (viola)
-                default: return null;
-            }
-        }
-
-        // Funzione per emettere il suono in base alla frequenza
-        let audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        let oscillator;
-        let isPlaying = false;
-
-        function playNote(frequenza) {
-            if (isPlaying) {
-                oscillator.stop();
-            }
-            oscillator = audioContext.createOscillator();
-            oscillator.type = 'sine'; // Tipo dell'oscillatore, onda sinusoidale
-            oscillator.frequency.setValueAtTime(frequenza, audioContext.currentTime);
-            oscillator.connect(audioContext.destination);
-            oscillator.start();
-            isPlaying = true;
-        }
-
-        function stopNote() {
-            if (isPlaying) {
-                oscillator.stop();
-                isPlaying = false;
-            }
-        }
-
-        // Funzione per rilevare e agire sui colori
-        function detectColorAndPlay() {
-            const color = getColorFromCamera();
-            const noteData = getNoteFromColor(color);
-
-            const messageElement = document.getElementById('message');
-            if (noteData) {
-                messageElement.innerHTML = `Colore Riconosciuto: ${noteData.note}`;
-                playNote(noteData.frequency);
-            } else {
-                messageElement.innerHTML = 'Nessun colore riconosciuto';
-                stopNote();
-            }
-        }
-
-        // Verifica continuamente il colore
-        setInterval(detectColorAndPlay, 500); // Ogni 500ms verifica il colore
-    </script>
+    startVideo();
+  </script>
 </body>
 </html>
